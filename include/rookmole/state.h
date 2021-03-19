@@ -18,7 +18,7 @@
 namespace rockmole
 {
     // --------------------------------------------------------------------------------------------
-    // Player
+    // Player       1 bit, where White usually means the side who is taking the turn.
 
     enum Player : uint8_t {
         White = 0,
@@ -31,7 +31,7 @@ namespace rockmole
     constexpr bool is_black(Player p) { return p == Player::Black; }
 
     // --------------------------------------------------------------------------------------------
-    // Coord
+    // Coord        1 byte, which holds either (1..8, 1..8) or (0,0).
 
     struct Coord {
         uint8_t rank : 4;  // -y: 8...1
@@ -77,7 +77,7 @@ namespace rockmole
     inline Coord other_player(Coord c) { assert(is_valid(c)); return Coord{9 - c.rank, 9 - c.file}; }
 
     // --------------------------------------------------------------------------------------------
-    // MoveCoord
+    // MoveCoord        A pair of coordinates from->to.
 
     struct MoveCoord {
         Coord from;
@@ -91,7 +91,7 @@ namespace rockmole
     inline MoveCoord other_player(MoveCoord mv) { return {other_player(mv.from), other_player(mv.to)}; }
 
     // --------------------------------------------------------------------------------------------
-    // MoveCoordList
+    // MoveCoordList    A vector of coordinate-based moves.
 
     using MoveCoordList = std::vector<MoveCoord>;
 
@@ -133,7 +133,7 @@ namespace rockmole
     MoveCoordList make_coord_moves(const std::string& s);
 
     // --------------------------------------------------------------------------------------------
-    // Square
+    // Square           4 bit chessboard cell: holds the color and piece.
 
     enum Square : uint8_t {
         Empty       = 0,
@@ -160,7 +160,7 @@ namespace rockmole
     constexpr Player get_player(Square sq) { assert(!is_empty(sq)); return (sq < 0b1000) ? Player::White : Player::Black; }
 
     // --------------------------------------------------------------------------------------------
-    // State
+    // State            35 bytes of any valid chess game state.
 
     struct State {
         uint8_t squares[8 * 8 / 2];
@@ -195,7 +195,7 @@ namespace rockmole
     };
 
     // --------------------------------------------------------------------------------------------
-    // ScopedTemporaryPieceMover
+    // ScopedTemporaryPieceMover        Moves the piece on construction, restores on destruction.
 
     class ScopedTemporaryPieceMover {
         State& _state;
@@ -224,7 +224,7 @@ namespace rockmole
     };
 
     // --------------------------------------------------------------------------------------------
-    // SquareDynView, SquareReadView, SquareView
+    // SquareDynView, SquareReadView, SquareView    View the chessboard state as if the viewer had white pieces.
 
     class SquareDynView {
         State& _state;
@@ -268,18 +268,39 @@ namespace rockmole
 
         Player player() const { return player_; }
         Square operator()(Coord c) const { return view_square(_state.get_square(view_coord(c))); }
-        void set(Coord c, Square sq) { _state.get_square(view_coord(c), view_square(sq)); }
+        void set(Coord c, Square sq) { _state.set_square(view_coord(c), view_square(sq)); }
 
         Coord view_coord(Coord coord) const { return player() == Player::White ? coord : Coord{9 - coord.rank, 9 - coord.file}; }
-        Square view_square(Square sq) const { return (is_empty(sq) || player() == Player::White) ? sq : (Square)(sq ^ 0b10000000); }
+        Square view_square(Square sq) const { return (is_empty(sq) || player() == Player::White) ? sq : other_color(sq); }
     };
 
     std::ostream& operator<<(std::ostream& out, const State& state);
     State make_start_state(Player starting_player);
     State make_custom_state(std::string placement, Player player_to_move, bool reverse_players);
 
+    template<typename CbT>
+    auto view_state(const State& s, const CbT& cb) {
+        return is_white(s.player_to_move) ? cb(SquareReadView<Player::White>{s}) : cb(SquareReadView<Player::Black>{s});
+    }
+
+    template<typename CbT>
+    auto view_state(State& s, const CbT& cb) {
+        return is_white(s.player_to_move) ? cb(SquareView<Player::White>{s}) : cb(SquareView<Player::Black>{s});
+    }
+
+    template<typename StateViewT>
+    MoveCoord view_move(MoveCoord mv, const StateViewT& sv) {
+        return MoveCoord{sv.view_coord(mv.from), sv.view_coord(mv.to)};
+    }
+
+    template<typename StateViewT>
+    MoveCoordList view_moves(MoveCoordList mv, const StateViewT& sv) {
+        if (is_black(sv.player())) other_player_inplace(mv);
+        return mv;
+    }
+
     // --------------------------------------------------------------------------------------------
-    // get_legal_moves
+    // get_legal_moves      Gets all the legal moves from any valid state.
 
     template<typename CbT>
     void foreach_vicinity(Coord c, const CbT& cb) {
@@ -315,8 +336,8 @@ namespace rockmole
         }
     }
 
-    template<Player player_>
-    bool is_attacked(Coord c0, const SquareReadView<player_>& sv) {
+    template<typename SquareViewT>
+    bool is_attacked(Coord c0, const SquareViewT& sv) {
         assert(is_valid(c0));
         bool attacked = false;
 
@@ -368,8 +389,8 @@ namespace rockmole
         return false;
     }
 
-    template<Player player_>
-    Coord find_white_king(const SquareReadView<player_>& sv) {
+    template<typename SquareViewT>
+    Coord find_white_king(const SquareViewT& sv) {
         for (uint8_t rank = 1; rank <= 8; ++rank) {
             for (uint8_t file = 1; file <= 8; ++file) {
                 auto c = Coord{rank, file};
@@ -486,6 +507,7 @@ namespace rockmole
                                 return is_empty(sq);
                             });
                         }
+                        // TODO: Castling
                         break;
                     }
 
@@ -506,8 +528,95 @@ namespace rockmole
 
     inline MoveCoordList get_legal_moves(const State& s, MoveCoordList&& out = {})
     {
-        return is_white(s.player_to_move) ?
-            _get_legal_moves(s, SquareReadView<Player::White>{s}, std::move(out)) :
-            _get_legal_moves(s, SquareReadView<Player::Black>{s}, std::move(out));
+        return view_state(s, [&s, &out](auto sv) {
+            return _get_legal_moves(s, sv, std::move(out));
+        });
     }
+
+    // --------------------------------------------------------------------------------------------
+    // make_move
+
+    struct MoveState {
+        State state;
+        MoveCoordList next_moves;
+        bool king_in_check;
+    };
+
+    inline MoveState make_move(State s, MoveCoord m) {
+        const auto moved_piece = s.get_square((m.from));
+        s.set_square(m.from, Square::Empty);
+        s.set_square(m.to, moved_piece);
+
+        if (s.en_passant_file != 0) {
+            auto en_passant_coord = Coord{is_white(s.player_to_move) ? 6 : 3, s.en_passant_file};
+            if (m.to == en_passant_coord) {
+                view_state(s, [=, &s](auto sv) {
+                    if (sv.view_square(moved_piece) == Square::WhitePawn) {
+                        const auto en_passtant_coord_view = sv.view_coord(en_passant_coord);
+                        assert(en_passtant_coord_view.rank == 6);
+
+                        const auto en_passtant_culprit_coord_view = en_passtant_coord_view.get_off(-1, 0);
+                        assert(sv(en_passtant_culprit_coord_view) == Square::BlackPawn);
+
+                        sv.set(en_passtant_culprit_coord_view, Square::Empty);
+                    }
+
+                });
+            }
+        }
+
+        // TODO: Castling
+
+        // Remove the castling bits upon move of the king or rooks.
+        view_state(s, [=, &s](auto sv) {
+            auto forbid_left_castling = [&s] {
+                if (is_white(s.player_to_move)) s.white_long_castling_possible = false; else s.black_short_castling_possible = false;
+            };
+            auto forbid_right_castling = [&s] {
+                if (is_white(s.player_to_move)) s.white_short_castling_possible = false; else s.black_long_castling_possible = false;
+            };
+
+            const auto moved_piece_view = sv.view_square(moved_piece);
+            if (moved_piece_view == Square::WhiteKing) {
+                forbid_left_castling();
+                forbid_right_castling();
+            }
+            else if (moved_piece_view == Square::WhiteRook) {
+                const auto m_from = sv.view_coord(m.from);
+                if (m_from == Coord{1,1}) {
+                    forbid_left_castling();
+                }
+                else if (m_from == Coord{1,8}) {
+                    forbid_right_castling();
+                }
+            }
+        });
+
+        // For a pawn's long leap, mark the possible en passant file for the opponent.
+        view_state(s, [=, &s](auto sv) {
+            const bool en_passant =
+                sv.view_square(moved_piece) == Square::WhitePawn &&
+                sv.view_coord(m.from).file == 2 &&
+                sv.view_coord(m.to).file == 4;
+            s.en_passant_file = en_passant ? m.from.file : 0;
+        });
+
+        // Switch to the opponent.
+        s.player_to_move = other_player(s.player_to_move);
+        if (is_white(s.player_to_move)) ++s.move_count;
+
+        // Determine whether the king is in check.
+        const bool king_in_check = view_state(s, [=, &s](auto sv) {
+            const auto moved_piece_view = sv.view_square(moved_piece);
+            auto white_king_coord = find_white_king(sv);
+            if (is_invalid(white_king_coord)) return false;
+            return is_attacked(white_king_coord, sv);
+        });
+
+        // Find next legal moves.
+        auto next_moves = get_legal_moves(s);
+
+        return {s, std::move(next_moves), king_in_check};
+    }
+
 }
