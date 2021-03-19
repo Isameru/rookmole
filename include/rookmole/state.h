@@ -17,10 +17,6 @@
 
 namespace rockmole
 {
-    constexpr uint8_t RANKS = 8;
-    constexpr uint8_t FILES = 8;
-    constexpr uint8_t SQUARES = RANKS * FILES;
-
     // --------------------------------------------------------------------------------------------
     // Player
 
@@ -95,7 +91,7 @@ namespace rockmole
     inline MoveCoord other_player(MoveCoord mv) { return {other_player(mv.from), other_player(mv.to)}; }
 
     // --------------------------------------------------------------------------------------------
-    // MoveCoord
+    // MoveCoordList
 
     using MoveCoordList = std::vector<MoveCoord>;
 
@@ -174,7 +170,7 @@ namespace rockmole
         bool black_long_castling_possible : 1;
         Player player_to_move : 1;
         uint8_t en_passant_file : 4;
-        uint8_t allmove_count;
+        uint8_t move_count : 7;
 
         Square get_square(Coord coord) const {
             assert(is_valid(coord));
@@ -186,7 +182,6 @@ namespace rockmole
 
         void set_square(Coord coord, Square sq) {
             assert(is_valid(coord));
-            //return squares[FILES * (8 - coord.rank) + (coord.file - 1)];
             const uint8_t sq_index = (uint8_t)(8 * (8 - coord.rank) + (coord.file - 1));
             const bool high_nibble = sq_index % 2;
             uint8_t& tsq = squares[sq_index / 2];
@@ -392,7 +387,9 @@ namespace rockmole
         out.clear();
 
         auto white_king_coord = find_white_king(sv);
-        auto en_passant_coord = s.en_passant_file != 0 ? sv.view_coord(Coord{6, s.en_passant_file}) : Coord::invalid();
+        auto en_passant_coord = s.en_passant_file != 0 ?
+            sv.view_coord(Coord{is_white(s.player_to_move) ? 6 : 3, s.en_passant_file}) :
+            Coord::invalid();
 
         for (uint8_t rank = 1; rank <= 8; ++rank) {
             for (uint8_t file = 1; file <= 8; ++file) {

@@ -46,7 +46,7 @@ namespace rockmole
         const auto headline_fg_code = "93";
 
         auto headline = std::string{"Move "};
-        headline.append(std::to_string(state.allmove_count / 2));
+        headline.append(std::to_string(state.move_count));
         headline.append(" for ");
         headline.append(to_string(state.player_to_move));
 

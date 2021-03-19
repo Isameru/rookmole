@@ -11,14 +11,14 @@ using namespace rockmole;
 TEMPLATE_TEST_CASE("start", "[moves]", (std::integral_constant<Player, Player::White>), (std::integral_constant<Player, Player::Black>)) {
     constexpr Player p = TestType::value;
     const auto s = make_start_state(p);
-    //std::cout << "Starting state\n" << s << std::endl;
+
     REQUIRE(s.white_short_castling_possible);
     REQUIRE(s.white_long_castling_possible);
     REQUIRE(s.black_short_castling_possible);
     REQUIRE(s.black_long_castling_possible);
     REQUIRE(s.player_to_move == p);
     REQUIRE(s.en_passant_file == 0);
-    REQUIRE(s.allmove_count == 0);
+    REQUIRE(s.move_count == 0);
 }
 
 TEMPLATE_TEST_CASE("pawn", "[moves]", (std::integral_constant<Player, Player::White>), (std::integral_constant<Player, Player::Black>)) {
@@ -35,9 +35,8 @@ TEMPLATE_TEST_CASE("en_passant", "[moves]", (std::integral_constant<Player, Play
     constexpr bool reverse = p == Player::Black;
     auto s = make_custom_state("pf5 | pg5", Player::White, reverse);
     auto sv = SquareView<p>{s};
-    s.en_passant_file = 7;
+    s.en_passant_file = reverse ? 2 : 7;
     auto ms = get_legal_moves(s);
-    std::cout << s;
 
     if (reverse) other_player_inplace(ms);
     REQUIRE(ms == make_coord_moves("f5:f6 f5:g6"));
