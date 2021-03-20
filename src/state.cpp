@@ -90,7 +90,7 @@ namespace rockmole
         return out << "\033[0;" << border_bg_code << ';' << border_fg_code << "m    a  b  c  d  e  f  g  h   \033[0m";
     }
 
-    State make_start_state(Player starting_player)
+    State make_start_state()
     {
         auto state = State{};
         auto put_piece = [&state](Coord c, Square sq) {
@@ -115,7 +115,7 @@ namespace rockmole
         state.white_long_castling_possible = true;
         state.black_short_castling_possible = true;
         state.black_long_castling_possible = true;
-        state.player_to_move = starting_player;
+        state.player_to_move = Player::White;
 
         return state;
     }

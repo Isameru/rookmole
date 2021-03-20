@@ -275,7 +275,7 @@ namespace rockmole
     };
 
     std::ostream& operator<<(std::ostream& out, const State& state);
-    State make_start_state(Player starting_player);
+    State make_start_state();
     State make_custom_state(std::string placement, Player player_to_move, bool reverse_players);
 
     template<typename CbT>
@@ -375,7 +375,7 @@ namespace rockmole
                     attacked = true;
                     return false;
                 }
-                return true;
+                return is_empty(sq);
             });
             if (attacked) return true;
         }
@@ -477,7 +477,7 @@ namespace rockmole
                         const std::pair<int8_t, int8_t> diag_dir_offs[] = {{-1,-1}, {1,1}, {-1,1}, {1,-1}};
                         for (const auto off : diag_dir_offs) {
                             foreach_in_dir(c, off.first, off.second, [&](Coord c_to) {
-                                const auto sq = sv(c);
+                                const auto sq = sv(c_to);
                                 if (!is_white(sq)) add_move(c_to);
                                 return is_empty(sq);
                             });
@@ -489,7 +489,7 @@ namespace rockmole
                         const std::pair<int8_t, int8_t> hv_dir_offs[] = {{0,-1}, {0,1}, {-1,0}, {1,0}};
                         for (const auto off : hv_dir_offs) {
                             foreach_in_dir(c, off.first, off.second, [&](Coord c_to) {
-                                const auto sq = sv(c);
+                                const auto sq = sv(c_to);
                                 if (!is_white(sq)) add_move(c_to);
                                 return is_empty(sq);
                             });
@@ -502,12 +502,11 @@ namespace rockmole
                             {-1,-1}, {1,1}, {-1,1}, {1,-1}, {0,-1}, {0,1}, {-1,0}, {1,0} };
                         for (const auto off : all_dir_offs) {
                             foreach_in_dir(c, off.first, off.second, [&](Coord c_to) {
-                                const auto sq = sv(c);
+                                const auto sq = sv(c_to);
                                 if (!is_white(sq)) add_move(c_to);
                                 return is_empty(sq);
                             });
                         }
-                        // TODO: Castling
                         break;
                     }
 
@@ -516,6 +515,7 @@ namespace rockmole
                             if (!is_white(sv(c_to))) add_move(c_to);
                             return true;
                         });
+                        // TODO: Castling
                         break;
                     }
 
@@ -543,7 +543,7 @@ namespace rockmole
     };
 
     inline MoveState make_move(State s, MoveCoord m) {
-        const auto moved_piece = s.get_square((m.from));
+        const auto moved_piece = s.get_square(m.from);
         s.set_square(m.from, Square::Empty);
         s.set_square(m.to, moved_piece);
 
@@ -560,45 +560,53 @@ namespace rockmole
 
                         sv.set(en_passtant_culprit_coord_view, Square::Empty);
                     }
-
                 });
             }
         }
 
         // TODO: Castling
 
-        // Remove the castling bits upon move of the king or rooks.
         view_state(s, [=, &s](auto sv) {
-            auto forbid_left_castling = [&s] {
-                if (is_white(s.player_to_move)) s.white_long_castling_possible = false; else s.black_short_castling_possible = false;
-            };
-            auto forbid_right_castling = [&s] {
-                if (is_white(s.player_to_move)) s.white_short_castling_possible = false; else s.black_long_castling_possible = false;
-            };
+            // Remove the castling bits upon move of the king or rooks.
+            {
+                auto forbid_left_castling = [&s] {
+                    if (is_white(s.player_to_move)) s.white_long_castling_possible = false; else s.black_short_castling_possible = false;
+                };
+                auto forbid_right_castling = [&s] {
+                    if (is_white(s.player_to_move)) s.white_short_castling_possible = false; else s.black_long_castling_possible = false;
+                };
 
-            const auto moved_piece_view = sv.view_square(moved_piece);
-            if (moved_piece_view == Square::WhiteKing) {
-                forbid_left_castling();
-                forbid_right_castling();
-            }
-            else if (moved_piece_view == Square::WhiteRook) {
-                const auto m_from = sv.view_coord(m.from);
-                if (m_from == Coord{1,1}) {
+                const auto moved_piece_view = sv.view_square(moved_piece);
+                if (moved_piece_view == Square::WhiteKing) {
                     forbid_left_castling();
-                }
-                else if (m_from == Coord{1,8}) {
                     forbid_right_castling();
                 }
+                else if (moved_piece_view == Square::WhiteRook) {
+                    const auto m_from = sv.view_coord(m.from);
+                    if (m_from == Coord{1,1}) {
+                        forbid_left_castling();
+                    }
+                    else if (m_from == Coord{1,8}) {
+                        forbid_right_castling();
+                    }
+                }
             }
-        });
 
-        // For a pawn's long leap, mark the possible en passant file for the opponent.
-        view_state(s, [=, &s](auto sv) {
-            const bool en_passant =
-                sv.view_square(moved_piece) == Square::WhitePawn &&
-                sv.view_coord(m.from).file == 2 &&
-                sv.view_coord(m.to).file == 4;
-            s.en_passant_file = en_passant ? m.from.file : 0;
+            // For a pawn's long leap, mark the possible en passant file for the opponent.
+            {
+                const bool en_passant =
+                    sv.view_square(moved_piece) == Square::WhitePawn &&
+                    sv.view_coord(m.from).file == 2 &&
+                    sv.view_coord(m.to).file == 4;
+                s.en_passant_file = en_passant ? m.from.file : 0;
+            }
+
+            // Pawn to Queen promotion.
+            {
+                if (sv.view_square(moved_piece) == Square::WhitePawn && sv.view_coord(m.to).rank == 8) {
+                    s.set_square(m.to, sv.view_square(Square::WhiteQueen));
+                }
+            }
         });
 
         // Switch to the opponent.
@@ -618,5 +626,4 @@ namespace rockmole
 
         return {s, std::move(next_moves), king_in_check};
     }
-
 }
