@@ -3,8 +3,8 @@
 
 namespace rockmole
 {
-    MoveCoordList make_coord_moves(const std::string& s) {
-        MoveCoordList out;
+    MoveCoordVec make_coord_moves(const std::string& s) {
+        MoveCoordVec out;
         Coord from;
         Coord to;
         Coord* curr = &from;

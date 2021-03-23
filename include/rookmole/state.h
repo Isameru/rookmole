@@ -38,7 +38,11 @@ namespace rockmole
         uint8_t file : 4;  //  x: 1...8
 
         Coord() : rank{0}, file{0} {}
-        template<typename RankT, typename FileT> Coord(RankT rank, FileT file) :
+
+        template<typename RankT, typename FileT,
+            std::enable_if_t<std::is_integral<RankT>::value, bool> = true,
+            std::enable_if_t<std::is_integral<FileT>::value, bool> = true>
+        Coord(RankT rank, FileT file) :
             rank{static_cast<uint8_t>(rank)}, file{static_cast<uint8_t>(file)} {
             assert(rank >= 1 && rank <= 8 && file >= 1 && file <= 8);
         }
@@ -65,12 +69,14 @@ namespace rockmole
     inline bool is_invalid(Coord c) { return !is_valid(c); }
 
     inline std::string to_string(Coord c) {
+        if (is_invalid(c)) return {"??"};
+
         const char cv[] = {
             (char)((char)c.file - 1 + 'a'),
             (char)('0' + c.rank),
             '\0'
         };
-        return std::string{cv};
+        return {cv};
     }
 
     inline std::ostream& operator<<(std::ostream& out, Coord c) { return out << to_string(c); }
@@ -91,20 +97,20 @@ namespace rockmole
     inline MoveCoord other_player(MoveCoord mv) { return {other_player(mv.from), other_player(mv.to)}; }
 
     // --------------------------------------------------------------------------------------------
-    // MoveCoordList    A vector of coordinate-based moves.
+    // MoveCoordVec     A vector of coordinate-based moves.
 
-    using MoveCoordList = std::vector<MoveCoord>;
+    using MoveCoordVec = std::vector<MoveCoord>;
 
-    inline std::ostream& operator<<(std::ostream& out, const MoveCoordList& mv) {
+    inline std::ostream& operator<<(std::ostream& out, const MoveCoordVec& mv) {
         if (!mv.empty()) {
             out << mv[0];
             for (size_t i = 1; i < mv.size(); ++i) out << " " << mv[i];
         }
         return out;
     }
-    inline void other_player_inplace(MoveCoordList& mv) { for (auto& m : mv) m = other_player(m); }
+    inline void other_player_inplace(MoveCoordVec& mv) { for (auto& m : mv) m = other_player(m); }
 
-    inline bool operator==(MoveCoordList a, MoveCoordList b) {
+    inline bool operator==(MoveCoordVec a, MoveCoordVec b) {
         if (a.size() != b.size()) return false;
 
         auto coord_less = [](MoveCoord a, MoveCoord b) {
@@ -126,11 +132,11 @@ namespace rockmole
         return true;
     }
 
-    inline bool operator!=(MoveCoordList a, MoveCoordList b) {
+    inline bool operator!=(MoveCoordVec a, MoveCoordVec b) {
         return !(std::move(a) == std::move(b));
     }
 
-    MoveCoordList make_coord_moves(const std::string& s);
+    MoveCoordVec make_coord_moves(const std::string& s);
 
     // --------------------------------------------------------------------------------------------
     // Square           4 bit chessboard cell: holds the color and piece.
@@ -294,7 +300,7 @@ namespace rockmole
     }
 
     template<typename StateViewT>
-    MoveCoordList view_moves(MoveCoordList mv, const StateViewT& sv) {
+    MoveCoordVec view_moves(MoveCoordVec mv, const StateViewT& sv) {
         if (is_black(sv.player())) other_player_inplace(mv);
         return mv;
     }
@@ -402,7 +408,7 @@ namespace rockmole
     }
 
     template<Player player_>
-    MoveCoordList _get_legal_moves(const State& s, const SquareReadView<player_>& sv, MoveCoordList&& out)
+    MoveCoordVec _get_legal_moves(const State& s, const SquareReadView<player_>& sv, MoveCoordVec&& out)
     {
         assert(s.player_to_move == sv.player());
         out.clear();
@@ -511,11 +517,75 @@ namespace rockmole
                     }
 
                     case Square::WhiteKing: {
+                        assert(c == white_king_coord);
+
                         foreach_vicinity(c, [&](Coord c_to) {
                             if (!is_white(sv(c_to))) add_move(c_to);
                             return true;
                         });
-                        // TODO: Castling
+
+                        bool left_castling_possible = (s.player_to_move == Player::White) ?
+                            s.white_long_castling_possible : s.black_short_castling_possible;
+                        bool right_castling_possible = (s.player_to_move == Player::White) ?
+                            s.white_short_castling_possible : s.black_long_castling_possible;
+
+                        if ((left_castling_possible || right_castling_possible) &&
+                            !is_attacked(white_king_coord, sv))
+                        {
+                            if (sv({1,1}) != Square::WhiteRook) {
+                                left_castling_possible = false;
+                            }
+
+                            if (left_castling_possible) {
+                                assert(sv({1,1}) == Square::WhiteRook);
+                                for (int file = 1; file < c.file; ++file) {
+                                    if (is_attacked({1, file}, sv)) {
+                                        left_castling_possible = false;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (left_castling_possible) {
+                                for (int file = 2; file < c.file; ++file) {
+                                    if (!is_empty(sv({1, file}))) {
+                                        left_castling_possible = false;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (left_castling_possible) {
+                                add_move(Coord{c.rank, c.file-2});
+                            }
+
+                            if (sv({1,8}) != Square::WhiteRook) {
+                                right_castling_possible = false;
+                            }
+
+                            if (right_castling_possible) {
+                                assert(sv({1,8}) == Square::WhiteRook);
+                                for (int file = c.file + 1; file <= 8; ++file) {
+                                    if (is_attacked({1, file}, sv)) {
+                                        right_castling_possible = false;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (right_castling_possible) {
+                                for (int file = c.file + 1; file <= 7; ++file) {
+                                    if (!is_empty(sv({1, file}))) {
+                                        right_castling_possible = false;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (right_castling_possible) {
+                                add_move(Coord{c.rank, c.file+2});
+                            }
+                        }
                         break;
                     }
 
@@ -526,7 +596,7 @@ namespace rockmole
         return out;
     }
 
-    inline MoveCoordList get_legal_moves(const State& s, MoveCoordList&& out = {})
+    inline MoveCoordVec get_legal_moves(const State& s, MoveCoordVec&& out = {})
     {
         return view_state(s, [&s, &out](auto sv) {
             return _get_legal_moves(s, sv, std::move(out));
@@ -538,11 +608,16 @@ namespace rockmole
 
     struct MoveState {
         State state;
-        MoveCoordList next_moves;
+        MoveCoordVec next_moves;
         bool king_in_check;
     };
 
     inline MoveState make_move(State s, MoveCoord m) {
+#ifndef NDEBUG
+        const auto all_legal_moves = get_legal_moves(s);
+        assert(std::find(std::begin(all_legal_moves), std::end(all_legal_moves), m) != std::end(all_legal_moves) && "Illegal move");
+#endif
+
         const auto moved_piece = s.get_square(m.from);
         s.set_square(m.from, Square::Empty);
         s.set_square(m.to, moved_piece);
@@ -564,10 +639,8 @@ namespace rockmole
             }
         }
 
-        // TODO: Castling
-
         view_state(s, [=, &s](auto sv) {
-            // Remove the castling bits upon move of the king or rooks.
+            // Castling.
             {
                 auto forbid_left_castling = [&s] {
                     if (is_white(s.player_to_move)) s.white_long_castling_possible = false; else s.black_short_castling_possible = false;
@@ -578,6 +651,43 @@ namespace rockmole
 
                 const auto moved_piece_view = sv.view_square(moved_piece);
                 if (moved_piece_view == Square::WhiteKing) {
+                    if (static_cast<int>(m.from.file) - 2 == m.to.file) {
+                        if (s.player_to_move == Player::White) {
+                            assert(s.white_long_castling_possible);
+                            assert(m.from == Coord(1,5));
+                            assert(m.to == Coord(1,3));
+                            assert(s.get_square({1,1}) == Square::WhiteRook);
+                            s.set_square({1,4}, Square::WhiteRook);
+                            s.set_square({1,1}, Square::Empty);
+                        }
+                        else {
+                            assert(s.black_long_castling_possible);
+                            assert(m.from == Coord(8,5));
+                            assert(m.to == Coord(8,3));
+                            assert(s.get_square({8,1}) == Square::BlackRook);
+                            s.set_square({8,4}, Square::BlackRook);
+                            s.set_square({8,1}, Square::Empty);
+                        }
+                    }
+                    else if (static_cast<int>(m.from.file) + 2 == m.to.file) {
+                        if (s.player_to_move == Player::White) {
+                            assert(s.white_short_castling_possible);
+                            assert(m.from == Coord(1,5));
+                            assert(m.to == Coord(1,7));
+                            assert(s.get_square({1,8}) == Square::WhiteRook);
+                            s.set_square({1,6}, Square::WhiteRook);
+                            s.set_square({1,8}, Square::Empty);
+                        }
+                        else {
+                            assert(s.black_short_castling_possible);
+                            assert(m.from == Coord(8,5));
+                            assert(m.to == Coord(8,7));
+                            assert(s.get_square({8,8}) == Square::BlackRook);
+                            s.set_square({8,6}, Square::BlackRook);
+                            s.set_square({8,8}, Square::Empty);
+                        }
+                    }
+
                     forbid_left_castling();
                     forbid_right_castling();
                 }
