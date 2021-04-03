@@ -19,22 +19,24 @@
 #include <iostream>
 #include <string>
 #include <string_view>
-#include <optional>
 #include <vector>
 
 namespace rookmole {
+
+//=≡=-=♔=-=≡=-=♕=-=≡=-=♖=-=≡=-=♗=-=≡=-=♘=-=≡=-=♙=-=≡=-=♚=-=≡=-=♛=-=≡=-=♜=-=≡=-=♝=-=≡=-=♞=-=≡=-=♟︎=-
 
 enum Player : uint8_t {
     White = 0,
     Black = 1
 };
 
-inline std::string to_string(Player p) noexcept { return p == Player::White ? "white" : "black"; }
-inline std::ostream& operator<<(std::ostream& out, Player p) { return out << to_string(p); }
-inline Player other_player(Player p) noexcept { return (Player)(p ^ 1); }
 constexpr bool is_white(Player p) noexcept { return p == Player::White; }
 constexpr bool is_black(Player p) noexcept { return p == Player::Black; }
+constexpr Player other_player(Player p) noexcept { return (Player)(p ^ 1); }
+inline std::string to_string(Player p) noexcept { return is_white(p) ? "white" : "black"; }
+inline std::ostream& operator<<(std::ostream& out, Player p) { return out << to_string(p); }
 
+//=≡=-=♔=-=≡=-=♕=-=≡=-=♖=-=≡=-=♗=-=≡=-=♘=-=≡=-=♙=-=≡=-=♚=-=≡=-=♛=-=≡=-=♜=-=≡=-=♝=-=≡=-=♞=-=≡=-=♟︎=-
 
 struct Coord {
     int8_t file;  // x
@@ -53,6 +55,8 @@ struct Coord {
         assert(text[0] >= 'a' && text[0] <= 'h');
         assert(text[1] >= '1' && text[1] <= '8');
     }
+
+    constexpr static Coord invalid() noexcept { return {0, 0}; }
 };
 
 static_assert(sizeof(Coord) == 2);
@@ -63,6 +67,7 @@ constexpr bool operator!=(Coord c1, Coord c2) noexcept { return !(c1 == c2); }
 constexpr bool is_valid(Coord c) noexcept { return c.file >= 1 && c.file <= 8 && c.rank >= 1 && c.rank <= 8; }
 constexpr bool is_invalid(Coord c) noexcept { return !is_valid(c); }
 constexpr Coord other_player(Coord c) noexcept { assert(is_valid(c)); return Coord{9 - c.file, 9 - c.rank}; }
+
 template<bool reverse = false>
 constexpr Coord make_coord(std::string_view text) noexcept {
     return !reverse ? Coord{text} : other_player(Coord{text});
@@ -70,17 +75,13 @@ constexpr Coord make_coord(std::string_view text) noexcept {
 
 inline std::string to_string(Coord c) noexcept {
     if (is_invalid(c)) return {"??"};
-
-    const char cv[] = {
-        static_cast<char>(c.file - 1 + 'a'),
-        static_cast<char>('0' + c.rank),
-        '\0'
-    };
+    const char cv[] = { static_cast<char>(c.file - 1 + 'a'), static_cast<char>('0' + c.rank), '\0' };
     return {cv};
 }
 
 inline std::ostream& operator<<(std::ostream& out, Coord c) { return out << to_string(c); }
 
+//=≡=-=♔=-=≡=-=♕=-=≡=-=♖=-=≡=-=♗=-=≡=-=♘=-=≡=-=♙=-=≡=-=♚=-=≡=-=♛=-=≡=-=♜=-=≡=-=♝=-=≡=-=♞=-=≡=-=♟︎=-
 
 struct MoveCoord {
     Coord from;
@@ -101,54 +102,25 @@ static_assert(sizeof(MoveCoord) == 4);
 constexpr bool operator==(MoveCoord mc0, MoveCoord mc1) noexcept { return mc0.from == mc1.from && mc0.to == mc1.to; }
 constexpr bool operator!=(MoveCoord mc0, MoveCoord mc1) noexcept { return !(mc0 == mc1); }
 constexpr MoveCoord other_player(MoveCoord c) noexcept { return {other_player(c.from), other_player(c.to)}; }
+
 template<bool reverse = false>
-constexpr MoveCoord make_coord_move(std::string_view text) {
+constexpr MoveCoord make_move_coord(std::string_view text) noexcept {
     return !reverse ? MoveCoord{text} : other_player(MoveCoord{text});
 }
 
 inline std::ostream& operator<<(std::ostream& out, MoveCoord mc) { return out << mc.from << ':' << mc.to; }
 
+//=≡=-=♔=-=≡=-=♕=-=≡=-=♖=-=≡=-=♗=-=≡=-=♘=-=≡=-=♙=-=≡=-=♚=-=≡=-=♛=-=≡=-=♜=-=≡=-=♝=-=≡=-=♞=-=≡=-=♟︎=-
 
 using MoveCoordVec = std::vector<MoveCoord>;
 
-inline std::ostream& operator<<(std::ostream& out, const MoveCoordVec& mv) {
-    if (!mv.empty()) {
-        out << mv[0];
-        for (size_t i = 1; i < mv.size(); ++i)
-            out << " " << mv[i];
-    }
-    return out;
-}
+std::ostream& operator<<(std::ostream& out, const MoveCoordVec& mv);
+bool operator==(MoveCoordVec a, MoveCoordVec b);
+inline bool operator!=(MoveCoordVec a, MoveCoordVec b) { return !(std::move(a) == std::move(b)); }
+MoveCoordVec make_move_coord_vec(std::string_view text, bool reverse = false);
+bool is_move_coord_legal(const MoveCoordVec& legal_moves, MoveCoord move) noexcept;
 
-// TODO: Work out something better.
-inline bool operator==(MoveCoordVec a, MoveCoordVec b) {
-    if (a.size() != b.size()) return false;
-
-    auto coord_less = [](MoveCoord a, MoveCoord b) {
-        if (a.from.rank < b.from.rank) return true;
-        if (a.from.rank > b.from.rank) return false;
-        if (a.from.file < b.from.file) return true;
-        if (a.from.file > b.from.file) return false;
-        if (a.to.rank < b.to.rank) return true;
-        if (a.to.rank > b.to.rank) return false;
-        if (a.to.file < b.to.file) return true;
-        return false;
-    };
-    std::sort(std::begin(a), std::end(a), coord_less);
-    std::sort(std::begin(b), std::end(b), coord_less);
-
-    for (size_t i = 0; i < a.size(); ++i) {
-        if (a[i] != b[i]) return false;
-    }
-    return true;
-}
-
-inline bool operator!=(MoveCoordVec a, MoveCoordVec b) {
-    return !(std::move(a) == std::move(b));
-}
-
-MoveCoordVec make_coord_moves(std::string_view text, bool reverse = false);
-
+//=≡=-=♔=-=≡=-=♕=-=≡=-=♖=-=≡=-=♗=-=≡=-=♘=-=≡=-=♙=-=≡=-=♚=-=≡=-=♛=-=≡=-=♜=-=≡=-=♝=-=≡=-=♞=-=≡=-=♟︎=-
 
 enum Piece : uint8_t {
     None        = 0,
@@ -179,13 +151,13 @@ enum Square : uint8_t {
     BlackKing   = 0b1110,
 };
 
-constexpr Square square(Player player, Piece piece) noexcept { return static_cast<Square>((player << 3) | piece); }
+constexpr Square make_square(Player player, Piece piece) noexcept { return static_cast<Square>((player << 3) | piece); }
 constexpr bool is_empty(Square sq) noexcept { return sq == 0; }
 constexpr bool is_white(Square sq) noexcept { return sq > 0 && sq < 0b1000; }
 constexpr bool is_black(Square sq) noexcept { return sq >= 0b1000; }
-constexpr Player player(Square sq) noexcept { assert(!is_empty(sq)); return is_black(sq) ? Player::Black : Player::White; }
-constexpr Piece piece(Square sq) noexcept { return static_cast<Piece>(sq & 0b111); }
-constexpr Piece piece(char c) noexcept {
+constexpr Player player_of(Square sq) noexcept { assert(!is_empty(sq)); return is_black(sq) ? Player::Black : Player::White; }
+constexpr Piece piece_of(Square sq) noexcept { return static_cast<Piece>(sq & 0b111); }
+constexpr Piece piece_of(char c) noexcept {
     switch (c) {
         case 'p': return Piece::Pawn;
         case 'N': return Piece::Knight;
@@ -199,8 +171,7 @@ constexpr Piece piece(char c) noexcept {
     }
 }
 
-//constexpr Square other_color(Square sq) { return is_empty(sq) ? sq : (Square)(sq ^ 0b1000); }
-//constexpr Player get_player(Square sq) { assert(!is_empty(sq)); return (sq < 0b1000) ? Player::White : Player::Black; }
+//=≡=-=♔=-=≡=-=♕=-=≡=-=♖=-=≡=-=♗=-=≡=-=♘=-=≡=-=♙=-=≡=-=♚=-=≡=-=♛=-=≡=-=♜=-=≡=-=♝=-=≡=-=♞=-=≡=-=♟︎=-
 
 struct GameState {
     std::array<uint8_t, 8 * 8 / 2> squares;
@@ -208,9 +179,9 @@ struct GameState {
     bool h1_castling_forbidden : 1;
     bool a8_castling_forbidden : 1;
     bool h8_castling_forbidden : 1;
-    Player player_to_move : 1;
-    uint8_t en_passant_file : 4;  // 0: No en passtant possibility
+    uint8_t en_passant_file : 4;  // 0: No en passtant possibility | 1..8: A file where opponent left an openinig for en passant.
     uint8_t move_count : 7;
+    Player player_to_move : 1;
 
     Square get_square(Coord coord) const noexcept {
         assert(is_valid(coord));
@@ -248,18 +219,23 @@ struct GameState {
 
             if (!is_empty(sq)) {
                 assert(get_square(Coord{file, rank}) == sq);
-                cb(Coord{file, rank}, player(sq), piece(sq));
+                cb(Coord{file, rank}, player_of(sq), piece_of(sq));
             }
             if (!is_empty(sq2)) {
                 assert(get_square(Coord{file + 1, rank}) == sq2);
-                cb(Coord{file + 1, rank}, player(sq2), piece(sq2));
+                cb(Coord{file + 1, rank}, player_of(sq2), piece_of(sq2));
             }
         }
     }
 };
 
+static_assert(sizeof(GameState) == 34);
+
+GameState make_start_state();
+GameState make_custom_state(std::string_view text, Player player_to_move, bool reverse_players);
 std::ostream& operator<<(std::ostream& out, const GameState& state);
 
+//=≡=-=♔=-=≡=-=♕=-=≡=-=♖=-=≡=-=♗=-=≡=-=♘=-=≡=-=♙=-=≡=-=♚=-=≡=-=♛=-=≡=-=♜=-=≡=-=♝=-=≡=-=♞=-=≡=-=♟︎=-
 
 class ScopedPieceMover {
     GameState& _state;
@@ -285,9 +261,7 @@ public:
     }
 };
 
-GameState make_start_state();
-GameState make_custom_state(std::string_view text, Player player_to_move, bool reverse_players);
-
+//=≡=-=♔=-=≡=-=♕=-=≡=-=♖=-=≡=-=♗=-=≡=-=♘=-=≡=-=♙=-=≡=-=♚=-=≡=-=♛=-=≡=-=♜=-=≡=-=♝=-=≡=-=♞=-=≡=-=♟︎=-
 
 template<typename CbT>
 void foreach_vicinity(Coord c, const CbT& cb) {
@@ -326,214 +300,11 @@ inline bool is_attacked_by_him(Coord c, const GameState& s) noexcept {
     return is_attacked_by(other_player(s.player_to_move), c, s);
 }
 
-std::optional<Coord> find_king(Player p, const GameState& s) noexcept;
-inline std::optional<Coord> find_my_king(const GameState& s) noexcept {
-    return find_king(s.player_to_move, s);
-}
+Coord find_king(Player p, const GameState& s) noexcept;
+inline Coord find_my_king(const GameState& s) noexcept { return find_king(s.player_to_move, s); }
+MoveCoordVec get_legal_moves(const GameState& s);
 
-inline MoveCoordVec get_legal_moves(const GameState& s)
-{
-    auto out = MoveCoordVec{};
-    out.reserve(20);
-
-    auto my_king_coord_opt = find_my_king(s);
-    auto en_passant_coord_opt = s.en_passant_file != 0 ?
-        std::optional<Coord>{{s.en_passant_file, is_white(s.player_to_move) ? 6 : 3}} :
-        std::optional<Coord>{};
-
-    auto add_move = [&out, &s, my_king_coord_opt](MoveCoord mc) {
-        const auto sq_from = s(mc.from);
-        assert(player(sq_from) == s.player_to_move);
-        bool is_king_in_check_after_move;
-        if (my_king_coord_opt) {
-            auto king_coord_after_move = (piece(sq_from) == Piece::King) ? mc.to : *my_king_coord_opt;
-            auto temp_move = ScopedPieceMover{const_cast<GameState&>(s), mc};
-            is_king_in_check_after_move = is_attacked_by_him(king_coord_after_move, s);
-        }
-        else {
-            // There is no king on the chessboard.
-            is_king_in_check_after_move = false;
-        }
-
-        if (!is_king_in_check_after_move)
-            out.push_back(mc);
-    };
-
-    s.foreach_piece([&out, &s, &add_move, my_king_coord_opt, en_passant_coord_opt](Coord c, Player p, Piece pc) {
-        if (p != s.player_to_move) return;
-        const auto opponent = other_player(p);
-
-        switch (pc) {
-            case Piece::Pawn: {
-                assert(c.rank > 1 && c.rank < 8);
-                const int forward_rank_off = is_white(p) ? 1 : -1;
-                auto c_fwd = c + Coord{0, forward_rank_off};
-                assert(is_valid(c_fwd));
-
-                if (is_empty(s(c_fwd))) {
-                    add_move({c, c_fwd});
-
-                    if (c.rank == (is_white(p) ? 2 : 7)) {
-                        auto c_2fwd = c_fwd + Coord{0, forward_rank_off};
-                        if (is_valid(c_2fwd) && is_empty(s(c_2fwd))) {
-                            add_move({c, c_2fwd});
-                        }
-                    }
-                }
-
-                for (int i : {-1, 1}) {
-                    auto c_d = c + Coord{i, forward_rank_off};
-                    if (is_invalid(c_d)) continue;
-
-                    const auto sq_d = s(c_d);
-                    if ((!is_empty(sq_d) && (player(sq_d) == opponent)) ||
-                        (en_passant_coord_opt && c_d == *en_passant_coord_opt))
-                    {
-                        add_move({c, c_d});
-                    }
-                }
-
-                break;
-            }
-
-            case Piece::Knight: {
-                foreach_knight_attack(c, [&s, &add_move, c, opponent](Coord c_to) {
-                    const auto sq_to = s(c_to);
-                    if (is_empty(sq_to) || player(sq_to) == opponent)
-                        add_move({c, c_to});
-                    return true;
-                });
-                break;
-            }
-
-            case Piece::Bishop: {
-                constexpr Coord diag_dirs[] = {{-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
-                for (const auto dir : diag_dirs) {
-                    foreach_in_dir(c, dir, [&s, &add_move, c, opponent](Coord c_to) {
-                        const auto sq_to = s(c_to);
-                        if (is_empty(sq_to) || player(sq_to) == opponent)
-                            add_move({c, c_to});
-                        return is_empty(sq_to);
-                    });
-                }
-                break;
-            }
-
-            case Piece::Rook: {
-                constexpr Coord hv_dirs[] = {{0, -1}, {-1, 0}, {1, 0}, {0, 1}};
-                for (const auto dir : hv_dirs) {
-                    foreach_in_dir(c, dir, [&s, &add_move, c, opponent](Coord c_to) {
-                        const auto sq_to = s(c_to);
-                        if (is_empty(sq_to) || player(sq_to) == opponent)
-                            add_move({c, c_to});
-                        return is_empty(sq_to);
-                    });
-                }
-                break;
-            }
-
-            case Piece::Queen: {
-                constexpr Coord all_dirs[] = {
-                    {-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1} };
-                for (const auto dir : all_dirs) {
-                    foreach_in_dir(c, dir, [&s, &add_move, c, opponent](Coord c_to) {
-                        const auto sq_to = s(c_to);
-                        if (is_empty(sq_to) || player(sq_to) == opponent)
-                            add_move({c, c_to});
-                        return is_empty(sq_to);
-                    });
-                }
-                break;
-            }
-
-            case Piece::King: {
-                assert(my_king_coord_opt);
-                const auto my_king_coord = *my_king_coord_opt;
-                assert(c == my_king_coord);
-
-                foreach_vicinity(c, [&s, &add_move, c, opponent](Coord c_to) {
-                    const auto sq_to = s(c_to);
-                    if (is_empty(sq_to) || player(sq_to) == opponent)
-                        add_move({c, c_to});
-                    return true;
-                });
-
-                bool a_castling_possible = is_white(s.player_to_move) ?
-                    !s.a1_castling_forbidden : !s.a8_castling_forbidden;
-                bool h_castling_possible = is_white(s.player_to_move) ?
-                    !s.h1_castling_forbidden : !s.h8_castling_forbidden;
-
-                if ((a_castling_possible || h_castling_possible) &&
-                    c == (is_white(s.player_to_move) ? Coord{"e1"} : Coord{"e8"}) &&
-                    !is_attacked_by_him(my_king_coord, s))
-                {
-                    const int8_t castling_rank = is_white(s.player_to_move) ? 1 : 8;
-                    const auto c_a = Coord{1, castling_rank};
-                    const auto c_h = Coord{8, castling_rank};
-                    const auto sq_a = s(c_a);
-                    const auto sq_h = s(c_h);
-
-                    if (is_empty(sq_a) || player(sq_a) == opponent || piece(sq_a) != Piece::Rook) {
-                        a_castling_possible = false;
-                    }
-
-                    if (a_castling_possible) {
-                        for (int file = 2; file < c.file; ++file) {
-                            if (!is_empty(s({file, castling_rank}))) {
-                                a_castling_possible = false;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (a_castling_possible) {
-                        for (int file = 1; file < c.file; ++file) {
-                            if (is_attacked_by_him({file, castling_rank}, s)) {
-                                a_castling_possible = false;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (a_castling_possible) {
-                        add_move({c, {c.file - 2, c.rank}});
-                    }
-
-                    if (is_empty(sq_h) || player(sq_h) == opponent || piece(sq_h) != Piece::Rook) {
-                        h_castling_possible = false;
-                    }
-
-                    if (h_castling_possible) {
-                        for (int file = c.file + 1; file <= 7; ++file) {
-                            if (!is_empty(s({file, castling_rank}))) {
-                                h_castling_possible = false;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (h_castling_possible) {
-                        for (int file = c.file + 1; file <= 8; ++file) {
-                            if (is_attacked_by_him({file, castling_rank}, s)) {
-                                h_castling_possible = false;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (h_castling_possible) {
-                        add_move({c, {c.file + 2, c.rank}});
-                    }
-                }
-                break;
-            }
-
-        }
-    });
-
-    return out;
-}
-
+//=≡=-=♔=-=≡=-=♕=-=≡=-=♖=-=≡=-=♗=-=≡=-=♘=-=≡=-=♙=-=≡=-=♚=-=≡=-=♛=-=≡=-=♜=-=≡=-=♝=-=≡=-=♞=-=≡=-=♟︎=-
 
 struct GameNode {
     GameState state;
@@ -541,6 +312,9 @@ struct GameNode {
     bool king_in_check;
 };
 
+GameNode make_start_node();
 GameNode make_move(GameState s, MoveCoord m);
+
+//=≡=-=♔=-=≡=-=♕=-=≡=-=♖=-=≡=-=♗=-=≡=-=♘=-=≡=-=♙=-=≡=-=♚=-=≡=-=♛=-=≡=-=♜=-=≡=-=♝=-=≡=-=♞=-=≡=-=♟︎=-
 
 } // namespace rookmole

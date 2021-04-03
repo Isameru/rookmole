@@ -16,16 +16,19 @@
 #include <rookmole/rookmole.h>
 using namespace rookmole;
 
+//=≡=-=♔=-=≡=-=♕=-=≡=-=♖=-=≡=-=♗=-=≡=-=♘=-=≡=-=♙=-=≡=-=♚=-=≡=-=♛=-=≡=-=♜=-=≡=-=♝=-=≡=-=♞=-=≡=-=♟︎=-
+
 int main(int argc, char* argv[])
 {
-    srand(124);
-    std::cout <<
-        R"(                       __                  .__)" "\n"
-        R"( _______  ____   ____ |  | __ _____   ____ |  |   ____)" "\n"
-        R"( \_  __ \/  _ \ /  _ \|  |/ //     \ /  _ \|  | _/ __ \)" "\n"
-        R"(  |  | \(  <_> |  <_> )    <|  Y Y  (  <_> )  |_\  ___/)" "\n"
-        R"(  |__|   \____/ \____/|__|_ \__|_|  /\____/|____/\___  >)" "\n"
-        R"(                           \/     \/                 \/)" << std::endl;
+    srand(12345);
+
+    std::cout << "\n"
+        R"( ██████╗  ██████╗  ██████╗ ██╗  ██╗███╗   ███╗ ██████╗ ██╗     ███████╗)" "\n"
+        R"( ██╔══██╗██╔═══██╗██╔═══██╗██║ ██╔╝████╗ ████║██╔═══██╗██║     ██╔════╝)" "\n"
+        R"( ██████╔╝██║   ██║██║   ██║█████╔╝ ██╔████╔██║██║   ██║██║     █████╗)" "\n"
+        R"( ██╔══██╗██║   ██║██║   ██║██╔═██╗ ██║╚██╔╝██║██║   ██║██║     ██╔══╝)" "\n"
+        R"( ██║  ██║╚██████╔╝╚██████╔╝██║  ██╗██║ ╚═╝ ██║╚██████╔╝███████╗███████╗)" "\n"
+        R"( ╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝ ╚═════╝ ╚══════╝╚══════╝)" "\n" << std::endl;
 
     auto human_player = Player::White;
     std::cout << "You play as: " << human_player << std::endl;
@@ -46,7 +49,7 @@ int main(int argc, char* argv[])
                 std::cout << "Your move: ";
                 std::string user_move_text;
                 std::cin >> user_move_text;
-                const auto user_move = make_coord_move(user_move_text);
+                const auto user_move = make_move_coord(user_move_text);
 
                 bool is_move_legal = false;
                 for (const auto legal_move : n.next_moves) {
@@ -84,3 +87,5 @@ int main(int argc, char* argv[])
 
     return 0;
 }
+
+//=≡=-=♔=-=≡=-=♕=-=≡=-=♖=-=≡=-=♗=-=≡=-=♘=-=≡=-=♙=-=≡=-=♚=-=≡=-=♛=-=≡=-=♜=-=≡=-=♝=-=≡=-=♞=-=≡=-=♟︎=-
