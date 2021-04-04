@@ -42,6 +42,8 @@ struct Coord {
     int8_t file;  // x
     int8_t rank;  // y
 
+    constexpr Coord() noexcept : file{0}, rank{0} {}
+
     template<typename FileT, typename RankT,
         std::enable_if_t<std::is_integral<FileT>::value, bool> = true,
         std::enable_if_t<std::is_integral<RankT>::value, bool> = true>
@@ -87,6 +89,7 @@ struct MoveCoord {
     Coord from;
     Coord to;
 
+    constexpr MoveCoord() noexcept = default;
     constexpr MoveCoord(Coord from_, Coord to_) noexcept : from{from_}, to{to_} {}
     constexpr MoveCoord(std::string_view text) noexcept :
         from{text.substr(0, 2)},
@@ -314,6 +317,7 @@ struct GameNode {
 
 GameNode make_start_node();
 GameNode make_move(GameState s, MoveCoord m);
+bool is_terminal(GameNode n) noexcept;
 
 //=≡=-=♔=-=≡=-=♕=-=≡=-=♖=-=≡=-=♗=-=≡=-=♘=-=≡=-=♙=-=≡=-=♚=-=≡=-=♛=-=≡=-=♜=-=≡=-=♝=-=≡=-=♞=-=≡=-=♟︎=-
 

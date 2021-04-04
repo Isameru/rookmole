@@ -12,6 +12,7 @@
 
 #include <chrono>
 #include <iostream>
+#include <limits>
 #include <type_traits>
 
 #define CATCH_CONFIG_MAIN
@@ -150,6 +151,16 @@ TEST_CASE("openings_depth3", "[perf]") {
     auto end_time = Clock::now();
     auto dur_msec = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
     std::cout << "Generated all " << msv.size() << " states for depth " << depth << " in " << (double)dur_msec / 1000.0 << " sec" << std::endl;
+
+    start_time = Clock::now();
+
+    for (const auto& n : msv) {
+        volatile auto score = evaluate_hardcode(Player::White, n);
+    }
+
+    end_time = Clock::now();
+    dur_msec = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+    std::cout << "Evaluated all " << msv.size() << " states for depth " << depth << " in " << (double)dur_msec / 1000.0 << " sec" << std::endl;
 }
 
 TEST_CASE("random_moves", "[perf]") {
@@ -172,4 +183,23 @@ TEST_CASE("random_moves", "[perf]") {
     auto end_time = Clock::now();
     auto dur_msec = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
     std::cout << "Random games played (80 moves): " << (1000.0 * (double)game_count / (double)dur_msec) << " games/sec" << std::endl;
+}
+
+TEST_CASE("play_alphabeta_depth3", "[perf]") {
+    using Clock = std::chrono::high_resolution_clock;
+    constexpr int depth = 3;
+
+    auto start_time = Clock::now();
+    auto node = make_start_node();
+
+    while (!is_terminal(node)) {
+        const auto best_result = alphabeta(node, depth);
+        node = make_move(node.state, best_result.move);
+    }
+
+    auto end_time = Clock::now();
+    auto dur_msec = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+    std::cout << "Game played with search depth " << depth <<
+        " ended after " << (int)node.state.move_count << " moves in " <<
+        ((double)dur_msec / 1000.0) << " sec" << std::endl;
 }

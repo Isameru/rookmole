@@ -553,6 +553,10 @@ GameNode make_move(GameState s, MoveCoord m) {
     return {s, std::move(next_moves), king_in_check};
 }
 
+bool is_terminal(GameNode n) noexcept {
+    return n.next_moves.empty() || n.state.move_count == 80;
+}
+
 //=≡=-=♔=-=≡=-=♕=-=≡=-=♖=-=≡=-=♗=-=≡=-=♘=-=≡=-=♙=-=≡=-=♚=-=≡=-=♛=-=≡=-=♜=-=≡=-=♝=-=≡=-=♞=-=≡=-=♟︎=-
 
 } // namespace rookmole

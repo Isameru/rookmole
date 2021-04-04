@@ -18,6 +18,8 @@ project(rookmole
     LANGUAGES   CXX)
 
 add_library(rookmole STATIC
+    src/alphabeta.cpp
+    src/evaluation.cpp
     src/state.cpp)
 
 target_compile_features(rookmole PUBLIC cxx_std_17)

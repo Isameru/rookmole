@@ -12,6 +12,14 @@
 
 #pragma once
 
-#include "rookmole/alphabeta.h"
 #include "rookmole/state.h"
-#include "rookmole/evaluation.h"
+
+namespace rookmole {
+
+//=≡=-=♔=-=≡=-=♕=-=≡=-=♖=-=≡=-=♗=-=≡=-=♘=-=≡=-=♙=-=≡=-=♚=-=≡=-=♛=-=≡=-=♜=-=≡=-=♝=-=≡=-=♞=-=≡=-=♟︎=-
+
+int evaluate_hardcode(Player eval_player, const GameNode& node) noexcept;
+
+//=≡=-=♔=-=≡=-=♕=-=≡=-=♖=-=≡=-=♗=-=≡=-=♘=-=≡=-=♙=-=≡=-=♚=-=≡=-=♛=-=≡=-=♜=-=≡=-=♝=-=≡=-=♞=-=≡=-=♟︎=-
+
+} // namespace rookmole
