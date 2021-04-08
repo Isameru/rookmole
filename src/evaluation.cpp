@@ -41,6 +41,13 @@ int evaluate_hardcode(Player eval_player, const GameNode& node) noexcept
         if (node.king_in_check) {
             score += -80;
         }
+
+        auto opponent_king_coord = find_king(other_player(node.state.player_to_move), node.state);
+        if (is_attacked_by(node.state.player_to_move, opponent_king_coord, node.state)) {
+            score += 80;
+        }
+
+        score += 4 * node.next_moves.size();
     }
 
     state.foreach_piece([&](Coord c, Player p, Piece pc) {
@@ -48,9 +55,11 @@ int evaluate_hardcode(Player eval_player, const GameNode& node) noexcept
         auto add_points = [&](int points) { score += score_mul * points; };
 
         switch (pc) {
-            case Pawn:
-                add_points(100);
+            case Pawn: {
+                const auto advancement = is_white(p) ? (c.rank - 2) : (7 - c.rank);
+                add_points(100 + 20 * advancement);
                 break;
+            }
             case Knight:
                 add_points(300);
                 break;

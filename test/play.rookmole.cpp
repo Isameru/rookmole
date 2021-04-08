@@ -71,7 +71,8 @@ int main(int argc, char* argv[])
                 }
             }
             else {
-                const auto search_result = alphabeta(n, 4);
+                std::cout << "Thinking..." << std::endl;
+                const auto search_result = alphabeta(n, 6);
                 move_to_make_opt = search_result.move;
             }
         }
